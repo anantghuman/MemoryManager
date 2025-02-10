@@ -40,5 +40,24 @@ bool circular = false;
  * is detected.
  */
 int check_bin(mem_block_header_t *free_head) {
+    mem_block_header_t* temp = free_head;
+    void* prev_address = NULL;
+    uint64_t prev_size = 0;
+    while (temp != NULL) {
+        size_t t = temp->block_metadata;
+        if ((t & 1) != 0)
+            return HEAP_FAILURE;
+        if (temp < prev_address)
+            return HEAP_FAILURE;
+        if ((uint8_t)temp % 16 != 0)
+            return HEAP_FAILURE;
+        if (prev_address != NULL && (prev_address + prev_size) >= (uint8_t)temp)
+            return HEAP_FAILURE;
+
+        prev_size = 0;
+        prev_size = (t >> 4) & 0xFFFFFFFFFFFFFFF;
+        prev_address = (uint8_t*)temp;
+        temp = temp->next;
+    }
     return HEAP_SUCCESS;
 }

@@ -4,7 +4,7 @@
 #include <assert.h>
 #include "ansicolors.h"
 
-const char author[] = ANSI_BOLD ANSI_COLOR_RED "REPLACE THIS WITH YOUR NAME AND UT EID" ANSI_RESET;
+const char author[] = ANSI_BOLD ANSI_COLOR_RED "Anant Ghuman asg3966" ANSI_RESET;
 
 /*
  * The following helpers can be used to interact with the mem_block_header_t
@@ -19,7 +19,54 @@ mem_block_header_t *free_heads[BIN_COUNT];
  */
 mem_block_header_t* select_bin(size_t size) {
     // Student TODO (REQUIRED)
-    return NULL;
+    if(size <= 16) {
+        if (free_heads[0] == NULL) {
+            return select_bin(size + 64);
+        }
+        mem_block_header_t *block = free_heads[0];
+        allocate(block);
+        free_heads[0] = free_heads[0]->next;
+        block->next = NULL;
+        return block;
+    } else if(size <= 64) {
+        if (free_heads[1] == NULL) {
+            return select_bin(size + 64);
+        }
+        mem_block_header_t *block = free_heads[1];
+        allocate(block);
+        free_heads[1] = free_heads[1]->next;
+        block->next = NULL;
+        return block;
+    } else if (size <= 512) {
+        if (free_heads[2] == NULL) {
+            return select_bin(size + 64);
+        }
+        mem_block_header_t *block = free_heads[2];
+        allocate(block);
+        free_heads[2] = free_heads[2]->next;
+        block->next = NULL;
+        return block;
+    } else {
+        if (free_heads[3] == NULL) {
+            int extra_size = 1024;
+            mem_block_header_t* block = (mem_block_header_t*) csbrk(size + extra_size);
+            if (block == (void*) -1) {
+                return NULL;
+            }
+            block->next = NULL;
+            set_block_metadata(block, size, false);
+            mem_block_header_t* extra_block = (mem_block_header_t*)((char*)block + size);
+            set_block_metadata(extra_block, extra_size, false);
+            extra_block->next = NULL;
+            free_heads[3] = block;
+            free_heads[3]->next = extra_block;
+        }
+        mem_block_header_t *block = free_heads[3];
+        allocate(block);
+        free_heads[3] = free_heads[3]->next;
+        block->next = NULL;
+        return block
+    }
 }
 
 /*
@@ -27,7 +74,7 @@ mem_block_header_t* select_bin(size_t size) {
  */
 bool is_allocated(mem_block_header_t *block) {
     // Student TODO
-    return 0;
+    return block->block_metadata & 1;
 }
 
 /*
@@ -35,6 +82,7 @@ bool is_allocated(mem_block_header_t *block) {
  */
 void allocate(mem_block_header_t *block) {
     // Student TODO
+    block->block_metadata |= 1;
 }
 
 
@@ -43,6 +91,7 @@ void allocate(mem_block_header_t *block) {
  */
 void deallocate(mem_block_header_t *block) {
     // Student TODO
+    block->block_metadata &= ~1;
 }
 
 /*
@@ -50,7 +99,7 @@ void deallocate(mem_block_header_t *block) {
  */
 size_t get_size(mem_block_header_t *block) {
     // Student TODO
-    return 0;
+    return (block->block_metadata & ~0xF) >> 4;
 }
 
 /*
@@ -58,7 +107,7 @@ size_t get_size(mem_block_header_t *block) {
  */
 mem_block_header_t *get_next(mem_block_header_t *block) {
     // Student TODO
-    return NULL;
+    return block->next;
 }
 
 /*
@@ -68,6 +117,10 @@ mem_block_header_t *get_next(mem_block_header_t *block) {
  */
 void set_block_metadata(mem_block_header_t *block, size_t size, bool alloc) {
     // Optional student todo
+    block->block_metadata = size << 4;
+    if (alloc) {
+        allocate(block);
+    }
 }
 
 /*
@@ -75,7 +128,9 @@ void set_block_metadata(mem_block_header_t *block, size_t size, bool alloc) {
  */
 void *get_payload(mem_block_header_t *block) {
     // Student TODO
-    return NULL;
+    if (!block)
+        return NULL;
+    return (void *)((char *)block + sizeof(mem_block_header_t));
 }
 
 /*
@@ -83,7 +138,9 @@ void *get_payload(mem_block_header_t *block) {
  */
 mem_block_header_t *get_header(void *payload) {
     // Student TODO
-    return NULL;
+    if (!payload)
+        return NULL;
+    return (mem_block_header_t *)((char *)payload - sizeof(mem_block_header_t));
 }
 
 /*
@@ -96,7 +153,9 @@ mem_block_header_t *get_header(void *payload) {
  */
 mem_block_header_t *find(size_t payload_size) {
     // Student TODO
-    return NULL;
+    if (payload_size == 0)
+        return NULL;
+    return select_bin(payload_size);
 }
 
 /*
@@ -104,7 +163,15 @@ mem_block_header_t *find(size_t payload_size) {
  */
 mem_block_header_t *extend(size_t size) {
     // Student TODO
-    return NULL;
+    if (size == 0)
+        return NULL;
+    mem_block_header_t *block = (mem_block_header_t *)csbrk(size);
+    if (block == (void *)-1) {
+        return NULL;
+    }
+    set_block_metadata(block, size, false);
+    block->next = NULL;
+    return block;
 }
 
 /*
@@ -112,7 +179,9 @@ mem_block_header_t *extend(size_t size) {
  */
 mem_block_header_t *split(mem_block_header_t *block, size_t new_block_size) {
     // Student TODO
-    return NULL;
+    if (!block || new_block_size == 0)
+        return NULL;
+    
 }
 
 /*
@@ -120,7 +189,15 @@ mem_block_header_t *split(mem_block_header_t *block, size_t new_block_size) {
  */
 mem_block_header_t *coalesce(mem_block_header_t *block) {
     // Student TODO
-    return NULL;
+    if (!block)
+        return NULL;
+    mem_block_header_t *next_block = get_next(block);
+    while (next_block && !is_allocated(next_block)) {
+        block->block_metadata += get_size(next_block) + sizeof(mem_block_header_t);
+        block->next = get_next(next_block);
+        next_block = get_next(block);
+    }
+    return block;
 }
 
 
@@ -130,6 +207,18 @@ mem_block_header_t *coalesce(mem_block_header_t *block) {
  */
 int uinit() {
     // Student TODO
+    for (int i = 0; i < BIN_COUNT; i++) {
+        free_heads[i] = NULL;
+    }
+    void *initial_heap = csbrk(INITIAL_HEAP_SIZE);
+    if (initial_heap == (void *) -1) {
+        return -1;
+    }
+    mem_block_header_t *block = (mem_block_header_t *) initial_heap;
+    block->block_metadata = INITIAL_HEAP_SIZE - sizeof(mem_block_header_t);
+    block->next = NULL;
+
+    free_heads[3] = block;
     return 0;
 }
 
@@ -139,7 +228,7 @@ int uinit() {
 void *umalloc(size_t size)
 {
     // STUDENT TODO
-	return NULL;
+	
 }
 
 /**
