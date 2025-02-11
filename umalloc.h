@@ -4,7 +4,6 @@
 #define ALIGNMENT 16 /* The alignment of all payloads returned by umalloc */
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~(ALIGNMENT-1))
 #define BIN_COUNT 4
-#define INITIAL_HEAP_SIZE 4096
 
 /*
  * mem_block_header_t - Represents a block of memory managed by the heap. The 
