@@ -190,7 +190,7 @@ mem_block_header_t *coalesce(mem_block_header_t *block) {
  */
 int uinit() {
     // Student TODO
-    int t = FIRST_BIN;
+    int t = 16;
     for (int i = 0; i < BIN_COUNT; i++) {
         free_heads[i] = extend(t);
         if (free_heads[i] == (void *) -1) {
