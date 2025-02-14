@@ -11,8 +11,10 @@ const char author[] = ANSI_BOLD ANSI_COLOR_RED "Anant Ghuman asg3966" ANSI_RESET
  * struct, they can be adjusted as necessary.
  */
 
+const int FIRST_BIN = 16;
+const int SECOND_BIN = 64;
+const int THIRD_BIN = 512;
 mem_block_header_t *free_heads[BIN_COUNT];
-mem_block_header_t* head;
 
 /*
  * select_bin - selects a free list bin to use based on the 
@@ -20,43 +22,33 @@ mem_block_header_t* head;
  */
 mem_block_header_t* select_bin(size_t size) {
     // Student TODO (REQUIRED)
-    if(size <= 16) {
-        if (free_heads[0] == NULL) {
-            return extend(size + 16);
-        }
-        mem_block_header_t *block = free_heads[0];
-        allocate(block);
-        free_heads[0] = free_heads[0]->next;
-        block->next = NULL;
-        return block;
-    } else if(size <= 64) {
-        if (free_heads[1] == NULL) {
-            return extend(size + 16);
-        }
-        mem_block_header_t *block = free_heads[1];
-        allocate(block);
-        free_heads[1] = free_heads[1]->next;
-        block->next = NULL;
-        return block;
-    } else if (size <= 512) {
-        if (free_heads[2] == NULL) {
-            return extend(size + 16);
-        }
-        mem_block_header_t *block = free_heads[2];
-        allocate(block);
-        free_heads[2] = free_heads[2]->next;
-        block->next = NULL;
-        return block;
-    } else {
-        if (free_heads[3] == NULL) {
-            return extend(size + 16);
-        }
-        mem_block_header_t *block = free_heads[3];
-        allocate(block);
-        free_heads[3] = free_heads[3]->next;
-        block->next = NULL;
-        return block;
+    int index = (size <= FIRST_BIN) ? 0 : (size <= SECOND_BIN) ? 1 : (size <= THIRD_BIN) ? 2 : 3;
+
+    // Ensure block size is large enough before using it
+    mem_block_header_t *prev = NULL;
+    mem_block_header_t *curr = free_heads[index];
+    while (curr && get_size(curr) < size) { 
+        prev = curr;
+        curr = curr->next;
     }
+
+    if (curr) {
+        // Allocate from a valid block
+        allocate(curr);
+        if (prev) {
+            prev->next = curr->next;  // Remove from free list
+        } else {
+            free_heads[index] = curr->next;
+        }
+        curr->next = NULL;
+        return curr;
+    }
+
+    // No valid block found, extend memory
+    mem_block_header_t *new_block = extend(size + sizeof(mem_block_header_t));
+    if (!new_block) 
+        return NULL;
+    return new_block;
 }
 
 /*
@@ -198,18 +190,14 @@ mem_block_header_t *coalesce(mem_block_header_t *block) {
  */
 int uinit() {
     // Student TODO
+    int t = 16;
     for (int i = 0; i < BIN_COUNT; i++) {
-        free_heads[i] = NULL;
+        free_heads[i] = extend(t);
+        if (free_heads[i] == (void *) -1) {
+            return -1;
+        }
+        t *= 4;
     }
-    void *initial_heap = extend(PAGESIZE);
-    if (initial_heap == (void *) -1) {
-        return -1;
-    }
-    mem_block_header_t *block = (mem_block_header_t *) initial_heap;
-    block->block_metadata = PAGESIZE - sizeof(mem_block_header_t);
-    block->next = NULL;
-
-    free_heads[3] = block;
     return 0;
 }
 
@@ -236,18 +224,17 @@ void *umalloc(size_t size)
  * must have been called by a previous malloc call
  * @brief frees the memory space pointed to by ptr.
  */
-void ufree(void *ptr)
-{
-    // STUDENT TODO
-    if (!ptr)
+void ufree(void *ptr) {
+    if (!ptr) 
         return;
 
     mem_block_header_t *block = get_header(ptr);
-    if (!block)
+    if (!block || !is_allocated(block)) 
         return;
-    if (!is_allocated(block))
-        return;
-    deallocate(block);
+
+    deallocate(block); 
+
+    //block = coalesce(block);
 
     size_t size = get_size(block);
     int bin_index;
@@ -259,20 +246,19 @@ void ufree(void *ptr)
         bin_index = 2;
     else
         bin_index = 3;
-    mem_block_header_t* temp = free_heads[bin_index];
-    if (temp != NULL) {
+
+    mem_block_header_t *prev = NULL;
+    mem_block_header_t *curr = free_heads[bin_index];
+
+    while (curr && curr < block) {
+        prev = curr;
+        curr = curr->next;
+    }
+
+    block->next = curr;
+    if (prev) {
+        prev->next = block; 
+    } else {
         free_heads[bin_index] = block;
-        return;
     }
-    if (temp < block) {
-        block->next = free_heads[bin_index];
-        free_heads[bin_index] = block;
-        return;
-    }
-    mem_block_header_t* prev = NULL;
-    while (temp != NULL && temp > block) {
-        prev = temp;
-        temp = temp->next;
-    }
-    prev->next = block;
 }
