@@ -190,7 +190,7 @@ mem_block_header_t *coalesce(mem_block_header_t *block) {
  */
 int uinit() {
     // Student TODO
-    int t = 16;
+    int t = FIRST_BIN;
     for (int i = 0; i < BIN_COUNT; i++) {
         free_heads[i] = extend(t);
         if (free_heads[i] == (void *) -1) {
@@ -238,11 +238,11 @@ void ufree(void *ptr) {
 
     size_t size = get_size(block);
     int bin_index;
-    if (size <= 16)
+    if (size <= FIRST_BIN)
         bin_index = 0;
-    else if (size <= 64)
+    else if (size <= SECOND_BIN)
         bin_index = 1;
-    else if (size <= 512)
+    else if (size <= THIRD_BIN)
         bin_index = 2;
     else
         bin_index = 3;
