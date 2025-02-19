@@ -11,9 +11,7 @@ const char author[] = ANSI_BOLD ANSI_COLOR_RED "Anant Ghuman asg3966" ANSI_RESET
  * struct, they can be adjusted as necessary.
  */
 
-const static int FIRST_BIN = 16;
-const static int SECOND_BIN = 64;
-const static int THIRD_BIN = 512;
+
 mem_block_header_t *free_heads[BIN_COUNT];
 
 /*
@@ -21,9 +19,9 @@ mem_block_header_t *free_heads[BIN_COUNT];
  * block size.
  */
 mem_block_header_t* select_bin(size_t size) {
-    int index = (size <= FIRST_BIN) ? 0
-                : (size <= SECOND_BIN) ? 1
-                : (size <= THIRD_BIN) ? 2
+    int index = (size <= 16) ? 0
+                : (size <= 64) ? 1
+                : (size <= 512) ? 2
                 : 3;
 
     mem_block_header_t *prev = NULL;
@@ -203,11 +201,11 @@ mem_block_header_t *split(mem_block_header_t *block, size_t new_block_size) {
     set_block_metadata(block, new_block_size, true);
     int bin_index;
     size_t split_size = get_size(split);
-    if (split_size <= FIRST_BIN)
+    if (split_size <= 16)
         bin_index = 0;
-    else if (split_size <= SECOND_BIN)
+    else if (split_size <= 64)
         bin_index = 1;
-    else if (split_size <= THIRD_BIN)
+    else if (split_size <= 512)
         bin_index = 2;
     else
         bin_index = 3;
@@ -257,9 +255,10 @@ mem_block_header_t *coalesce(mem_block_header_t *block) {
  */
 int uinit() {
     // Student TODO
+    int arr[BIN_COUNT] = {16, 64, 512, 2048};
     int t = 16;
     for (int i = 0; i < BIN_COUNT; i++) {
-        free_heads[i] = extend(t);
+        free_heads[i] = extend(arr[i]);
         if (free_heads[i] == (void *) -1) {
             return -1;
         }
