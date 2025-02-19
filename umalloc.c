@@ -21,10 +21,11 @@ mem_block_header_t *free_heads[BIN_COUNT];
  * block size.
  */
 mem_block_header_t* select_bin(size_t size) {
-    // Student TODO (REQUIRED)
-    int index = (size <= FIRST_BIN) ? 0 : (size <= SECOND_BIN) ? 1 : (size <= THIRD_BIN) ? 2 : 3;
+    int index = (size <= FIRST_BIN) ? 0
+                : (size <= SECOND_BIN) ? 1
+                : (size <= THIRD_BIN) ? 2
+                : 3;
 
-    // Ensure block size is large enough before using it
     mem_block_header_t *prev = NULL;
     mem_block_header_t *curr = free_heads[index];
     while (curr && get_size(curr) < size) { 
@@ -33,50 +34,43 @@ mem_block_header_t* select_bin(size_t size) {
     }
 
     if (curr) {
-        // Allocate from a valid block
         if (get_size(curr) >= size + sizeof(mem_block_header_t) + ALIGNMENT) {
             curr = split(curr, size);
         }
         allocate(curr);
         if (prev) {
-            prev->next = curr->next;  // Remove from free list
+            prev->next = curr->next;
         } else {
             free_heads[index] = curr->next;
         }
         curr->next = NULL;
         return curr;
     }
+
+    /* Search for a block in larger bins */
     for (int i = index + 1; i < BIN_COUNT; i++) {
-        if (free_heads[i]) {
-            curr = free_heads[i];
-            prev = NULL;
-
-            // Search for a block in the larger bin
-            while (curr && get_size(curr) < size) {
-                prev = curr;
-                curr = curr->next;
+        prev = NULL;
+        curr = free_heads[i];
+        while (curr && get_size(curr) < size) {
+            prev = curr;
+            curr = curr->next;
+        }
+        if (curr) {
+            if (get_size(curr) >= size + sizeof(mem_block_header_t) + ALIGNMENT) {
+                curr = split(curr, size);
             }
-
-            if (curr) {
-                // Split if necessary
-                if (get_size(curr) >= size + sizeof(mem_block_header_t) + ALIGNMENT) {
-                    return split(curr, size);
-                }
-
-                // Allocate the found block
-                allocate(curr);
-                if (prev) {
-                    prev->next = curr->next;
-                } else {
-                    free_heads[i] = curr->next;
-                }
-                curr->next = NULL;
-                return curr;
+            allocate(curr);
+            if (prev) {
+                prev->next = curr->next;
+            } else {
+                free_heads[i] = curr->next;
             }
+            curr->next = NULL;
+            return curr;
         }
     }
-
-    // No valid block found, extend memory
+    
+    /* No valid block found, extend memory */
     mem_block_header_t *new_block = extend(size + sizeof(mem_block_header_t));
     if (!new_block) 
         return NULL;
@@ -214,10 +208,22 @@ mem_block_header_t *split(mem_block_header_t *block, size_t new_block_size) {
     else
         bin_index = 3;
 
-    // Add the split block to the front of the correct free list bin
-    split->next = free_heads[bin_index];
-    free_heads[bin_index] = split;
-
+    mem_block_header_t *prev = NULL;
+    mem_block_header_t *curr = free_heads[bin_index];
+    
+    while (curr && (curr < split)) { 
+        prev = curr;
+        curr = curr->next;
+    }
+    
+        // Insert the block in the correct position based on address
+    split->next = curr;
+    if (prev) {
+        prev->next = split;
+    } else {
+        free_heads[bin_index] = split;
+    }
+    
     return block;
 }
 
@@ -290,7 +296,7 @@ void ufree(void *ptr) {
 
     deallocate(block); 
 
-    block = coalesce(block);
+    //block = coalesce(block);
 
     size_t size = get_size(block);
     int bin_index;
