@@ -303,11 +303,11 @@ void ufree(void *ptr) {
 
     size_t size = get_size(block);
     int bin_index;
-    if (size <= FIRST_BIN)
+    if (size <= 16)
         bin_index = 0;
-    else if (size <= SECOND_BIN)
+    else if (size <= 64)
         bin_index = 1;
-    else if (size <= THIRD_BIN)
+    else if (size <= 512)
         bin_index = 2;
     else
         bin_index = 3;
