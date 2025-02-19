@@ -11,9 +11,9 @@ const char author[] = ANSI_BOLD ANSI_COLOR_RED "Anant Ghuman asg3966" ANSI_RESET
  * struct, they can be adjusted as necessary.
  */
 
-const int FIRST_BIN = 16;
-const int SECOND_BIN = 64;
-const int THIRD_BIN = 512;
+const static int FIRST_BIN = 16;
+const static int SECOND_BIN = 64;
+const static int THIRD_BIN = 512;
 mem_block_header_t *free_heads[BIN_COUNT];
 
 /*
@@ -163,7 +163,11 @@ mem_block_header_t *find(size_t payload_size) {
     // Student TODO
     if (payload_size == 0)
         return NULL;
-    return select_bin(payload_size);
+    mem_block_header_t *block = select_bin(payload_size);
+    if (block && get_size(block) >= payload_size + sizeof(mem_block_header_t) + ALIGNMENT) {
+        block = split(block, payload_size);
+    }
+    return block;
 }
 
 /*
@@ -234,15 +238,15 @@ mem_block_header_t *coalesce(mem_block_header_t *block) {
     // Student TODO
     if (!block)
         return NULL;
+
     mem_block_header_t *next_block = get_next(block);
     while (next_block && !is_allocated(next_block)) {
         size_t total_size = get_size(block) + sizeof(mem_block_header_t) + get_size(next_block);
         set_block_metadata(block, total_size, false);
-    
-        block->next = get_next(next_block);
-    
+        block->next = get_next(next_block); // Update the next pointer.
         next_block = get_next(block);
     }
+
     return block;
 }
 
@@ -296,7 +300,7 @@ void ufree(void *ptr) {
 
     deallocate(block); 
 
-    //block = coalesce(block);
+    block = coalesce(block);
 
     size_t size = get_size(block);
     int bin_index;
