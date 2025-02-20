@@ -19,60 +19,10 @@ mem_block_header_t *free_heads[BIN_COUNT];
  * block size.
  */
 mem_block_header_t* select_bin(size_t size) {
-    int index = (size <= 16) ? 0
-                : (size <= 64) ? 1
-                : (size <= 512) ? 2
-                : 3;
-
-    mem_block_header_t *prev = NULL;
-    mem_block_header_t *curr = free_heads[index];
-    while (curr && get_size(curr) < size) { 
-        prev = curr;
-        curr = curr->next;
-    }
-
-    if (curr) {
-        if (get_size(curr) >= size + sizeof(mem_block_header_t) + ALIGNMENT) {
-            curr = split(curr, size);
-        }
-        allocate(curr);
-        if (prev) {
-            prev->next = curr->next;
-        } else {
-            free_heads[index] = curr->next;
-        }
-        curr->next = NULL;
-        return curr;
-    }
-
-    /* Search for a block in larger bins */
-    for (int i = index + 1; i < BIN_COUNT; i++) {
-        prev = NULL;
-        curr = free_heads[i];
-        while (curr && get_size(curr) < size) {
-            prev = curr;
-            curr = curr->next;
-        }
-        if (curr) {
-            if (get_size(curr) >= size + sizeof(mem_block_header_t) + ALIGNMENT) {
-                curr = split(curr, size);
-            }
-            allocate(curr);
-            if (prev) {
-                prev->next = curr->next;
-            } else {
-                free_heads[i] = curr->next;
-            }
-            curr->next = NULL;
-            return curr;
-        }
-    }
-    
-    /* No valid block found, extend memory */
-    mem_block_header_t *new_block = extend(size + sizeof(mem_block_header_t));
-    if (!new_block) 
-        return NULL;
-    return new_block;
+    return free_heads[(size <= 16) ? 0
+        : (size <= 64) ? 1
+        : (size <= 512) ? 2
+        : 3];
 }
 
 /*
@@ -161,12 +111,38 @@ mem_block_header_t *find(size_t payload_size) {
     // Student TODO
     if (payload_size == 0)
         return NULL;
-    mem_block_header_t *block = select_bin(payload_size);
-    if (block && get_size(block) >= payload_size + sizeof(mem_block_header_t) + ALIGNMENT) {
-        block = split(block, payload_size);
-    }
-    return block;
+    int index = (payload_size <= 16) ? 0
+        : (payload_size <= 64) ? 1
+        : (payload_size <= 512) ? 2
+        : 3;
+    for (int i = index; i < BIN_COUNT; i++) {
+        mem_block_header_t *prev = NULL;
+        mem_block_header_t *curr = free_heads[index];
+        while (curr && get_size(curr) < payload_size) {
+    prev = curr;
+    curr = curr->next;
 }
+            if (curr) {
+        // if (get_size(curr) >= size + sizeof(mem_block_header_t) + ALIGNMENT) {
+        //     curr = split(curr, size);
+        // }
+                allocate(curr);
+                if (prev) {
+                    prev->next = curr->next;
+                } else {
+                    free_heads[i] = curr->next;
+                }
+                curr->next = NULL;
+                return curr;
+            }
+        }
+
+        /* No valid block found, extend memory */
+        mem_block_header_t *new_block = extend(payload_size + sizeof(mem_block_header_t));
+        if (!new_block) 
+            return NULL;
+        return new_block;
+    }
 
 /*
  * extend - extends the heap if more memory is required.
@@ -176,7 +152,7 @@ mem_block_header_t *extend(size_t size) {
     if (size == 0)
         return NULL;
     mem_block_header_t *block = (mem_block_header_t *)csbrk(size);
-    if (block == (void *)-1) {
+    if (block == NULL) {
         return NULL;
     }
     set_block_metadata(block, size, false);
@@ -190,12 +166,12 @@ mem_block_header_t *extend(size_t size) {
 mem_block_header_t *split(mem_block_header_t *block, size_t new_block_size) {
     // Student TODO
     if (!block || new_block_size == 0)
-        return NULL;
+        return block;
     if (new_block_size % 16 != 0)
         new_block_size = ALIGN(new_block_size);
     size_t total_size = get_size(block);
     if (total_size - new_block_size < sizeof(mem_block_header_t) + ALIGNMENT)
-        return NULL;
+        return block;
     mem_block_header_t *split = (mem_block_header_t *)((char *)block + sizeof(mem_block_header_t) + new_block_size);
     set_block_metadata(split, total_size - new_block_size - sizeof(mem_block_header_t), false);
     set_block_metadata(block, new_block_size, true);
@@ -236,15 +212,24 @@ mem_block_header_t *coalesce(mem_block_header_t *block) {
     // Student TODO
     if (!block)
         return NULL;
-
-    mem_block_header_t *next_block = get_next(block);
-    while (next_block && !is_allocated(next_block)) {
-        size_t total_size = get_size(block) + sizeof(mem_block_header_t) + get_size(next_block);
-        set_block_metadata(block, total_size, false);
-        block->next = get_next(next_block); // Update the next pointer.
-        next_block = get_next(block);
+    
+    mem_block_header_t *next_block = block->next;
+    if (next_block && !is_allocated(next_block)) {
+        size_t next_size = get_size(next_block);
+        size_t size = get_size(block) + next_size;
+        set_block_metadata(block, size, false);
+        int bin_index = (next_size <= 16) ? 0 : (next_size <= 64) ? 1 : (next_size <= 512) ? 2 : 3;
+        if (free_heads[bin_index] == next_block) {
+            free_heads[bin_index] = next_block->next;
+        } else {
+            mem_block_header_t *prev = free_heads[bin_index];
+            while (prev->next != next_block) {
+                prev = prev->next;
+            }
+            prev->next = prev->next->next;
+        }
+        block->next = next_block->next;
     }
-
     return block;
 }
 
@@ -255,11 +240,10 @@ mem_block_header_t *coalesce(mem_block_header_t *block) {
  */
 int uinit() {
     // Student TODO
-    int arr[BIN_COUNT] = {16, 64, 512, 2048};
     int t = 16;
     for (int i = 0; i < BIN_COUNT; i++) {
-        free_heads[i] = extend(arr[i]);
-        if (free_heads[i] == (void *) -1) {
+        free_heads[i] = extend(t);
+        if (!free_heads[i]) {
             return -1;
         }
         t *= 4;
@@ -312,18 +296,6 @@ void ufree(void *ptr) {
     else
         bin_index = 3;
 
-    mem_block_header_t *prev = NULL;
-    mem_block_header_t *curr = free_heads[bin_index];
-
-    while (curr && curr < block) {
-        prev = curr;
-        curr = curr->next;
-    }
-
-    block->next = curr;
-    if (prev) {
-        prev->next = block; 
-    } else {
-        free_heads[bin_index] = block;
-    }
+    block->next = free_heads[bin_index];
+    free_heads[bin_index] = block;
 }

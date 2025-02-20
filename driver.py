@@ -93,7 +93,6 @@ if utilization_score < 35:
     utilization_score = 0
 
 performance_score = 15 * (performance_average / performance_target)
-performance_score = min(15, performance_score)
 
 correctness_average = sum(trace_correctness) / len(trace_correctness)
 correctness_score = 15 * correctness_average
