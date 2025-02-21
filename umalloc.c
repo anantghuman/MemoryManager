@@ -160,7 +160,6 @@ mem_block_header_t *extend(size_t size) {
     // sets the metadata for the block and coalesces it
     set_block_metadata(block, size, false);
     block->next = NULL;
-    coalesce(block);
     return block;
 }
 
