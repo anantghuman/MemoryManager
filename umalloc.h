@@ -26,6 +26,7 @@ size_t get_size(mem_block_header_t *block);
 mem_block_header_t *get_next(mem_block_header_t *block);
 void set_block_metadata(mem_block_header_t *block, size_t size, bool alloc);
 void *get_payload(mem_block_header_t *block);
+int select_bin_for_size(size_t payload_size);
 mem_block_header_t *get_block(void *payload);
 
 mem_block_header_t *find(size_t size);
