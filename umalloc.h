@@ -31,6 +31,7 @@ mem_block_header_t *get_block(void *payload);
 mem_block_header_t *find(size_t size);
 mem_block_header_t *extend(size_t size);
 mem_block_header_t *split(mem_block_header_t *block, size_t size);
+void add_to_free_list(mem_block_header_t *block);
 mem_block_header_t *coalesce(mem_block_header_t *block);
 
 
