@@ -140,7 +140,6 @@ mem_block_header_t *find(size_t payload_size) {
 
     // if no valid block found, extend memory
     mem_block_header_t *new_block = extend(ALIGN(payload_size + sizeof(mem_block_header_t)));
-    //new_block = split(new_block, payload_size);
     if (!new_block) 
         return NULL;
     return new_block;
@@ -153,10 +152,12 @@ mem_block_header_t *extend(size_t size) {
     // Student TODO
     if (size == 0)
         return NULL;
+    // extends the heap by the given size
     mem_block_header_t *block = (mem_block_header_t *)csbrk(size);
     if (block == NULL) {
         return NULL;
     }
+    // sets the metadata for the block and coalesces it
     set_block_metadata(block, size, false);
     block->next = NULL;
     coalesce(block);
@@ -170,20 +171,26 @@ mem_block_header_t *split(mem_block_header_t *block, size_t new_block_size) {
     size_t block_size = get_size(block);
     new_block_size = ALIGN(new_block_size + sizeof(mem_block_header_t));
 
+    // returns if the block is too small to split
     if (block_size < new_block_size + sizeof(mem_block_header_t) + ALIGNMENT) {
         return block;
     }
 
+    // splits the block into two parts, one allocated and one free
     set_block_metadata(block, new_block_size, true);
     mem_block_header_t *free_block = (mem_block_header_t *)((uintptr_t)block + new_block_size + sizeof(mem_block_header_t));
     set_block_metadata(free_block, block_size - new_block_size - sizeof(mem_block_header_t),false);
 
+    // adds the free block to the free list
     add_to_free_list(free_block);
     return block;
 }
 
-
+/*
+ * add_to_free_list - adds a block to the free list.
+ */  
 void add_to_free_list(mem_block_header_t *block) {
+    // finds the bin index for the block
     size_t size = get_size(block);
     int bin_index;
     if (size <= 16)
@@ -194,6 +201,7 @@ void add_to_free_list(mem_block_header_t *block) {
         bin_index = 2;
     else
         bin_index = 3;
+    // adds the block to the free list
     block->next = free_heads[bin_index];
     free_heads[bin_index] = block;
 }
@@ -204,13 +212,17 @@ void add_to_free_list(mem_block_header_t *block) {
 mem_block_header_t *coalesce(mem_block_header_t *block) {
     if (!block) 
         return NULL;
+    // finds the previous and next blocks in memory if they are unallocated
     mem_block_header_t *n = NULL;
     mem_block_header_t *p = NULL;
+    // loops through the bins to find the previous and next blocks
     for (int i = 0; i < BIN_COUNT; i++) {
         mem_block_header_t *prev = NULL;
         mem_block_header_t *curr = free_heads[i];
+        // loops through all elements in the current bin
         while (curr) {
             mem_block_header_t *next = curr->next; 
+            // if the block is the previous block, remove it from the free list
             if ((char *)curr + get_size(curr) + sizeof(mem_block_header_t) == (char *)block) {  
                 n = curr;
                 if (prev) 
@@ -218,26 +230,30 @@ mem_block_header_t *coalesce(mem_block_header_t *block) {
                 else 
                     free_heads[i] = curr->next;
             } 
+            // if the block is the next block, remove it from the free list
             else if ((char *)block + get_size(block) + sizeof(mem_block_header_t) == (char *)curr) {  
                 p = curr;
                 if (prev) 
                     prev->next = curr->next;
                 else 
                     free_heads[i] = curr->next;
-                } 
-        else {
-            prev = curr;
+            } // update prev and current
+            else {
+                prev = curr;
+            }
+                curr = next;  
         }
-        curr = next;  
     }
-}
+    // if there is no unallocated block before or after the current block, return the block
     if (!n && !p) {
         return block;  
     }
+    // if there is no next allocated block, merge the current block with the previous block
     if (!n) {
         set_block_metadata(block, get_size(block) + get_size(p) + sizeof(mem_block_header_t), false);
         return block;
     }
+    // if there is no previous allocated block, merge the current block with the previous block
     if (!p) {  
         set_block_metadata(n, get_size(n) + get_size(block) + sizeof(mem_block_header_t), false);
         return n;
@@ -253,6 +269,7 @@ mem_block_header_t *coalesce(mem_block_header_t *block) {
  */
 int uinit() {
     // Student TODO
+    // initializes the free list bins
     int t = 16;
     for (int i = 0; i < BIN_COUNT; i++) {
         free_heads[i] = extend(t);
@@ -275,10 +292,12 @@ void *umalloc(size_t size)
     if (size % ALIGNMENT != 0) {
         size = ALIGN(size);
     }
+    // finds a block that can satisfy the malloc request
     mem_block_header_t *block = find(size);
     if (!block) {
         return NULL;
     }
+    // splits the block if it is too large
     block = split(block, size);
     allocate(block);
     return get_payload(block);
@@ -290,15 +309,18 @@ void *umalloc(size_t size)
  * @brief frees the memory space pointed to by ptr.
  */
 void ufree(void *ptr) {
+    // STUDENT TODO
     if (!ptr) 
         return;
 
+    // gets the block from the pointer and deallocates it
     mem_block_header_t *block = get_header(ptr);
     if (!block || !is_allocated(block)) 
         return;
 
     deallocate(block); 
 
+    // coalesces the block and adds it to the free list
     block = coalesce(block);
     add_to_free_list(block);
 }
